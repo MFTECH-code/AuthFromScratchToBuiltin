@@ -11,22 +11,30 @@ var app = builder.Build();
 
 app.UseAuthentication();
 
-app.MapGet("/sweden", (HttpContext ctx) =>
+app.Use((ctx, next) =>
 {
+    if (ctx.Request.Path.StartsWithSegments("/login"))
+        return next();
+    
     if (!ctx.User.Identities.Any(x => x.AuthenticationType == AuthScheme))
     {
         // Not Authorized, (not authenticated)
         ctx.Response.StatusCode = 401;
-        return "";
+        return Task.CompletedTask;
     }
-
+    
     if (!ctx.User.HasClaim("passport_type", "bra"))
     {
         // Not Allowed, (you are authenticated but you dont have permission to access this content)
         ctx.Response.StatusCode = 403;
-        return "";
+        return Task.CompletedTask;
     }
+    
+    return next();
+});
 
+app.MapGet("/sweden", (HttpContext ctx) =>
+{
     return "Allowed";
 });
 
