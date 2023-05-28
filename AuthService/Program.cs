@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 
 const string AuthScheme = "cookie";
 
@@ -7,36 +8,26 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthentication(AuthScheme)
     .AddCookie(AuthScheme);
 
+builder.Services.AddAuthorization(builder =>
+{
+    builder.AddPolicy("bra passport", pb =>
+    {
+        pb.RequireAuthenticatedUser()
+            .AddAuthenticationSchemes(AuthScheme)
+            .RequireClaim("passport_type", "bra");
+    });
+});
+
 var app = builder.Build();
 
 app.UseAuthentication();
+app.UseAuthorization();
 
-app.Use((ctx, next) =>
-{
-    if (ctx.Request.Path.StartsWithSegments("/login"))
-        return next();
-    
-    if (!ctx.User.Identities.Any(x => x.AuthenticationType == AuthScheme))
-    {
-        // Not Authorized, (not authenticated)
-        ctx.Response.StatusCode = 401;
-        return Task.CompletedTask;
-    }
-    
-    if (!ctx.User.HasClaim("passport_type", "bra"))
-    {
-        // Not Allowed, (you are authenticated but you dont have permission to access this content)
-        ctx.Response.StatusCode = 403;
-        return Task.CompletedTask;
-    }
-    
-    return next();
-});
-
+//[Authorize(Policy = "bra passport")]
 app.MapGet("/sweden", (HttpContext ctx) =>
 {
     return "Allowed";
-});
+}).RequireAuthorization("bra passport");
 
 app.MapGet("/login", (HttpContext ctx) =>
 {
@@ -47,6 +38,6 @@ app.MapGet("/login", (HttpContext ctx) =>
     var user = new ClaimsPrincipal(identity);
     ctx.SignInAsync("cookie", user);
     return "ok";
-});
+}).AllowAnonymous();
 
 app.Run();
