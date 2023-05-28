@@ -1,24 +1,41 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 
+const string AuthScheme = "cookie";
+
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddAuthentication("cookie")
-    .AddCookie("cookie");
+builder.Services.AddAuthentication(AuthScheme)
+    .AddCookie(AuthScheme);
 
 var app = builder.Build();
 
 app.UseAuthentication();
 
-app.MapGet("/username", (HttpContext ctx) =>
+app.MapGet("/sweden", (HttpContext ctx) =>
 {
-    return ctx.User.FindFirst("usr").Value;
+    if (!ctx.User.Identities.Any(x => x.AuthenticationType == AuthScheme))
+    {
+        // Not Authorized, (not authenticated)
+        ctx.Response.StatusCode = 401;
+        return "";
+    }
+
+    if (!ctx.User.HasClaim("passport_type", "bra"))
+    {
+        // Not Allowed, (you are authenticated but you dont have permission to access this content)
+        ctx.Response.StatusCode = 403;
+        return "";
+    }
+
+    return "Allowed";
 });
 
 app.MapGet("/login", (HttpContext ctx) =>
 {
     var claims = new List<Claim>();
     claims.Add(new Claim("usr", "matheus"));
-    var identity = new ClaimsIdentity(claims, "cookie");
+    claims.Add(new Claim("passport_type", "bra"));
+    var identity = new ClaimsIdentity(claims, AuthScheme);
     var user = new ClaimsPrincipal(identity);
     ctx.SignInAsync("cookie", user);
     return "ok";
