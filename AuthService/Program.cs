@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authorization;
 
 const string AuthScheme = "cookie";
 
@@ -16,6 +15,13 @@ builder.Services.AddAuthorization(builder =>
             .AddAuthenticationSchemes(AuthScheme)
             .RequireClaim("passport_type", "bra");
     });
+    
+    builder.AddPolicy("role_permission", pb =>
+    {
+        pb.RequireAuthenticatedUser()
+            .AddAuthenticationSchemes(AuthScheme)
+            .RequireRole("admin");
+    });
 });
 
 var app = builder.Build();
@@ -24,17 +30,24 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 //[Authorize(Policy = "bra passport")]
-app.MapGet("/sweden", (HttpContext ctx) =>
+app.MapGet("/sweden", () =>
 {
     return "Allowed";
 }).RequireAuthorization("bra passport");
+
+app.MapGet("/admin", () =>
+{
+    return "Welcome admin";
+}).RequireAuthorization("role_permission");
 
 app.MapGet("/login", (HttpContext ctx) =>
 {
     var claims = new List<Claim>();
     claims.Add(new Claim("usr", "matheus"));
     claims.Add(new Claim("passport_type", "bra"));
-    var identity = new ClaimsIdentity(claims, AuthScheme);
+    //claims.Add(new Claim("role", "admin"));
+    claims.Add(new Claim("role", "user"));
+    var identity = new ClaimsIdentity(claims, AuthScheme, null, "role");
     var user = new ClaimsPrincipal(identity);
     ctx.SignInAsync("cookie", user);
     return "ok";
